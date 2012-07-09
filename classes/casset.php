@@ -1108,7 +1108,7 @@ class Casset {
 			return $a['file'];
 		}, $file_group)).($minify ? 'min' : '').$last_mod).'.'.$type;
 
-		$filepath = DOCROOT.static::$cache_path.'/'.$filename;
+		$filepath = DOCROOT.static::$cache_path.$filename;
 		$needs_update = (!file_exists($filepath));
 
 		if ($needs_update)
