@@ -526,6 +526,7 @@ class Casset {
 				$file = static::$default_path_key.'::'.$file;
 		}
 
+
 		if (!array_key_exists($group, static::$groups[$type]))
 		{
 			// Assume they want the group enabled
@@ -932,10 +933,13 @@ class Casset {
 		$path = static::$asset_paths[$parts[0]]['path'];
 		$file = $parts[1];
 
-		$folder = $file[0] == '/' ? '' : static::$asset_paths[$parts[0]]['dirs'][$asset_type];
-		$file = ltrim($file, '/');
+		$folder = $file[0] == '/' && $file[1] != '/' ? '' : static::$asset_paths[$parts[0]]['dirs'][$asset_type];
 
-		$remote = (strpos($path, '//') !== false);
+		$remote = (strpos($parts[1], '//') !== false);
+
+        if(!$remote) {
+            $file = ltrim($file, '/');
+        }
 
 		if ($remote)
 		{
@@ -943,7 +947,7 @@ class Casset {
 			// specified a file, not a glob pattern.
 			// Don't look for the file now either. That'll be done by
 			// file_get_contents later on, if need be.
-			return array($path.$folder.$file);
+			return array($file);
 		}
 		else
 		{
