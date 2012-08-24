@@ -22,13 +22,4 @@ Autoloader::add_classes(array(
 	'Casset\\Casset_Addons_Twig'    => __DIR__.'/classes/casset/addons/twig.php',
 ));
 
-// Shorcut for Asset::set
-if ( ! function_exists('__fp'))
-{
-	function __fp($name, $type, $add_url = true, $force_array = false)
-	{
-		return \Casset::get_filepath($name, $type, $add_url, $force_array);
-	}
-}
-
 /* End of file bootstrap.php */
