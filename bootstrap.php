@@ -25,7 +25,7 @@ Autoloader::add_classes(array(
 // Shorcut for Asset::set
 if ( ! function_exists('__fp'))
 {
-	function __fp($name, $type, $add_url = false, $force_array = false)
+	function __fp($name, $type, $add_url = true, $force_array = false)
 	{
 		return \Casset::get_filepath($name, $type, $add_url, $force_array);
 	}
