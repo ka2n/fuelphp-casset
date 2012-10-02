@@ -4,7 +4,7 @@
  * Casset: Convenient asset library for FuelPHP.
  *
  * @package    Casset
- * @version    v1.17
+ * @version    v1.19
  * @author     Antony Male
  * @license    MIT License
  * @copyright  2012 Antony Male
@@ -117,6 +117,11 @@ class Casset {
 	protected static $rendered_groups = array('js' => array(), 'css' => array());
 
 	/**
+	 * @var string which css uri rewriter we want to use. Options are 'absolute', 'relative', 'none'
+	*/
+	protected static $css_uri_rewriter = 'absolute';
+
+	/**
 	 * @var bool Wether we've been initialized.
 	 */
 	public static $initialized = false;
@@ -134,7 +139,10 @@ class Casset {
 
 		\Config::load('casset', true);
 
-		static::$asset_url = preg_replace('/^(https?:\/\/)/','//', \Config::get('casset.url', \Config::get('base_url')));
+		static::$asset_url = \Config::get('casset.url');
+		if (!static::$asset_url)
+			static::$asset_url = preg_replace('#^https?://#','//', \Uri::base(false));
+		static::$asset_url = rtrim(static::$asset_url, '/') . '/';
 
 		static::$default_folders = array(
 			'css' => \Config::get('casset.css_dir', static::$default_folders['css']),
@@ -182,7 +190,18 @@ class Casset {
 
 		static::$filepath_callback = \Config::get('casset.filepath_callback', static::$filepath_callback);
 
+		static::$css_uri_rewriter = \Config::get('casset.css_uri_rewriter', static::$css_uri_rewriter);
+
 		static::$initialized = true;
+	}
+
+	/**
+	 * Getter for cache_path
+	 *
+	 * @return string
+	 */
+	public static function get_cache_path() {
+		return static::$cache_path;
 	}
 
 
@@ -875,6 +894,8 @@ class Casset {
 				if ($inline)
 				{
 					$content = file_get_contents(DOCROOT.static::$cache_path.$filename);
+					// We'll need to fix the uris, unless they were rewritten absolutely to start with
+					$content = static::css_rewrite_uris($content, static::$cache_path.$filename, \Uri::string());
 					if ($options['gen_tags'])
 						$ret .= html_tag('style', $attr, PHP_EOL.$content.PHP_EOL).PHP_EOL;
 					else
@@ -895,7 +916,7 @@ class Casset {
 				{
 					if ($inline)
 					{
-						$content = static::load_file($file['file'], 'css');
+						$content = static::load_file($file['file'], 'css', false, \Uri::string());
 						if ($options['gen_tags'])
 							$ret .= html_tag('style', $attr, PHP_EOL.$content.PHP_EOL).PHP_EOL;
 						else
@@ -951,7 +972,7 @@ class Casset {
 		}
 		else
 		{
-			$glob_files = glob($path.$folder.$file);
+			$glob_files = array_filter(glob($path.$folder.$file), 'is_file');
 			if (!$glob_files || !count($glob_files))
 				throw new Casset_Exception("Found no files matching $path$folder$file");
 			return $glob_files;
@@ -1067,7 +1088,7 @@ class Casset {
 	 * @param type $filename
 	 * @return type
 	 */
-	protected static function load_file($filename, $type, $file_group = false)
+	protected static function load_file($filename, $type, $file_group = false, $destination_filename = null)
 	{
 		$content = file_get_contents($filename);
 		if (static::$post_load_callback != null)
@@ -1077,8 +1098,35 @@ class Casset {
 			$content = $func($content, $filename, $type, $file_group);
 		}
 		if ($type == 'css')
-			$content = Casset_Cssurirewriter::rewrite($content, dirname($filename));
+			$content = static::css_rewrite_uris($content, $filename, $destination_filename);
 		return $content;
+	}
+
+	/**
+	 * Selects the correct css uri rewriter, and applies it
+	 *
+	 * @param string $content the contents of the file to rewrite
+	 * @param string $filename the original location of the file
+	 * @param string $destination_filename the name of the file where the css will be written to
+	 * @return string The re-written content
+	*/
+	protected static function css_rewrite_uris($content, $filename, $destination_filename) {
+		switch (static::$css_uri_rewriter) {
+			case 'absolute':
+				$rewritten = Casset_Cssurirewriter::rewrite($content, dirname($filename));
+				break;
+			case 'relative':
+				$rewritten = Casset_Cssurirewriterrelative::rewrite_css($content, dirname($filename), dirname($destination_filename));
+				break;
+			case 'none':
+				$rewritten = $content;
+				break;
+			default:
+				throw new Casset_Exception('Unknown CSS URI rewriter: '.static::$css_uri_rewriter);
+				break;
+		}
+
+		return $rewritten;
 	}
 
 	/**
@@ -1112,8 +1160,9 @@ class Casset {
 			return $a['file'];
 		}, $file_group)).($minify ? 'min' : '').$last_mod).'.'.$type;
 
-		$filepath = DOCROOT.static::$cache_path.$filename;
-		$needs_update = (!file_exists($filepath));
+		$rel_filepath = static::$cache_path.'/'.$filename;
+		$abs_filepath = DOCROOT.$rel_filepath;
+		$needs_update = (!file_exists($abs_filepath));
 
 		if ($needs_update)
 		{
@@ -1123,10 +1172,10 @@ class Casset {
 				if (static::$show_files_inline)
 					$content .= PHP_EOL.'/* '.$file['file'].' */'.PHP_EOL.PHP_EOL;
 				if ($file['minified'] || !$minify)
-					$content .= static::load_file($file['file'], $type, $file_group).PHP_EOL;
+					$content .= static::load_file($file['file'], $type, $file_group, $rel_filepath).PHP_EOL;
 				else
 				{
-					$file_content = static::load_file($file['file'], $type, $file_group);
+					$file_content = static::load_file($file['file'], $type, $file_group, $rel_filepath);
 					if ($file_content === false)
 						throw new Casset_Exception("Couldn't not open file {$file['file']}");
 					if ($type == 'js')
@@ -1139,7 +1188,7 @@ class Casset {
 					}
 				}
 			}
-			file_put_contents($filepath, $content, LOCK_EX);
+			file_put_contents($abs_filepath, $content, LOCK_EX);
 			$mtime = time();
 		}
 
