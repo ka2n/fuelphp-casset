@@ -968,7 +968,7 @@ class Casset {
 			// specified a file, not a glob pattern.
 			// Don't look for the file now either. That'll be done by
 			// file_get_contents later on, if need be.
-			return array($file);
+			return array($path.$folder.$file);
 		}
 		else
 		{
