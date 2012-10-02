@@ -956,7 +956,7 @@ class Casset {
 
 		$folder = $file[0] == '/' && $file[1] != '/' ? '' : static::$asset_paths[$parts[0]]['dirs'][$asset_type];
 
-		$remote = (strpos($parts[1], '//') !== false);
+		$remote = (strpos($path.$folder.$file, '//') !== false);
 
         if(!$remote) {
             $file = ltrim($file, '/');
