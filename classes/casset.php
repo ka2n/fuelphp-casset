@@ -1162,7 +1162,13 @@ class Casset {
 
 		if ($needs_update)
 		{
-			$content = '';
+            if ($type == 'css')
+            { 
+                $content = "@charset \"UTF-8\"\n";
+            } else
+            {
+                $content = '';
+            }
 			foreach ($file_group as $file)
 			{
 				if (static::$show_files_inline)
